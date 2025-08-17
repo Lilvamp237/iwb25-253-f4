@@ -3,8 +3,25 @@
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+ }* { box-sizing: border-box; }
+
+body { 
+  margin: 0; background: #0b0c10; color: #eaeaea; 
 }
 
+.container { max-width: 720px; margin: 0 auto; padding: 1rem; }
+h1 { margin: 0 0 0.5rem 0; font-size: 1.75rem; }
+section { margin-top: 1rem; }
+textarea { width: 100%; min-height: 96px; padding: .75rem; border-radius: 12px; border: 1px solid #333; background: #111217; color: #eaeaea; }
+button { margin-top: .5rem; padding: .6rem 1rem; border: 0; border-radius: 12px; background: #4f46e5; color: white; cursor: pointer; }
+button[disabled] { opacity: .5; cursor: not-allowed; }
+ul { list-style: none; padding: 0; margin: .5rem 0 0; }
+li { padding: .75rem; border: 1px solid #2a2a2a; border-radius: 12px; margin-bottom: .5rem; background: #12131a; }
+small { color: #a0a0a0; }
+.muted { color: #9aa0a6; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.char { color: #a0a0a0; font-size: .85rem; }
 .logo {
   height: 6em;
   padding: 1.5em;
