@@ -1,0 +1,28 @@
+### Post a new message
+POST http://localhost:8080/message
+Content-Type: application/json
+
+{
+    "text": "This is a test from the REST client",
+    "lat": 6.9,
+    "lon": 79.8
+}
+
+### Get the message feed
+GET http://localhost:8080/feed
+
+HTTP/1.1 400  - Bad Request
+content-type: text/plain
+connection: close
+server: ballerina
+date: Sun, 17 Aug 2025 23:08:31 +0530
+content-encoding: gzip
+content-length: 88
+
+HTTP/1.1 200  - OK
+content-type: application/json
+connection: close
+server: ballerina
+date: Sun, 17 Aug 2025 23:08:31 +0530
+content-encoding: gzip
+content-length: 57
