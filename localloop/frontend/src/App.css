@@ -1,59 +1,111 @@
+/* App layout & component-level polish */
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--space-6);
   text-align: center;
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
- }* { box-sizing: border-box; }
-
-body { 
-  margin: 0; background: #0b0c10; color: #eaeaea; 
 }
 
-.container { max-width: 720px; margin: 0 auto; padding: 1rem; }
-h1 { margin: 0 0 0.5rem 0; font-size: 1.75rem; }
-section { margin-top: 1rem; }
-textarea { width: 100%; min-height: 96px; padding: .75rem; border-radius: 12px; border: 1px solid #333; background: #111217; color: #eaeaea; }
-button { margin-top: .5rem; padding: .6rem 1rem; border: 0; border-radius: 12px; background: #4f46e5; color: white; cursor: pointer; }
-button[disabled] { opacity: .5; cursor: not-allowed; }
-ul { list-style: none; padding: 0; margin: .5rem 0 0; }
-li { padding: .75rem; border: 1px solid #2a2a2a; border-radius: 12px; margin-bottom: .5rem; background: #12131a; }
-small { color: #a0a0a0; }
-.muted { color: #9aa0a6; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.char { color: #a0a0a0; font-size: .85rem; }
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  text-align: left;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Top bar: toggle sits at the far right */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.topbar #theme-toggle-button {
+  transform: scale(0.6);          
+  transform-origin: top right;     /* so it scales inward from the corner */
 }
 
-.card {
-  padding: 2em;
+/* Hero: centered heading + subtitle */
+.hero {
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+.page-title {
+  margin: 0 0 var(--space-2) 0;
+  font-size: clamp(2.25rem, 6vw, 3.25rem); /* larger than default */
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  display: block;
+  margin: 0 auto var(--space-4) auto;
+  max-width: 56ch;
 }
 
-.read-the-docs {
-  color: #888;
+/* Post form */
+form { 
+  margin-top: var(--space-3); 
 }
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+button { margin-top: var(--space-2); }
+
+/* Feed list */
+ul { margin-top: var(--space-3); }
+li {
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-sm);
+  transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
+}
+li:hover { transform: translateY(-1px); }
+li > div:first-child { /* message text */
+  font-weight: 650;
+  letter-spacing: 0.005em;
+}
+
+/* Replies */
+li ul { margin-top: var(--space-3); }
+li ul li {
+  margin: 0 0 var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+li ul li:last-child { margin-bottom: 0; }
+
+/* Inline helper bits */
+small { color: var(--muted); }
+
+/* Remove Vite demo leftovers (if any) */
+.logo, .card, .read-the-docs { display: none !important; }
+
+
+#theme-toggle-button {
+  font-size: 16px;
+  position: relative;
+  display: inline-block;
+  width: 7em;
+  cursor: pointer;
+}
+#toggle { opacity: 0; width: 0; height: 0; }
+#container, #patches, #stars, #button, #sun, #moon, #cloud {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 0.8s;
+}
+#toggle:checked + svg #container { fill: #2b4360; }               /* night sky */
+#toggle:checked + svg #button { transform: translate(28px, 2.333px); }
+#sun { opacity: 1; }            #toggle:checked + svg #sun { opacity: 0; }
+#moon { opacity: 0; }           #toggle:checked + svg #moon { opacity: 1; }
+#cloud { opacity: 1; }          #toggle:checked + svg #cloud { opacity: 0; }
+#stars { opacity: 0; }          #toggle:checked + svg #stars { opacity: 1; }
+
+/* Optional: compact on small screens */
+@media (max-width: 420px) { #theme-toggle-button { width: 5.6em; } }

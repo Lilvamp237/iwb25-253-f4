@@ -3,7 +3,7 @@ import './app.css'
 import PostForm from './components/PostForm'
 import Feed from './components/Feed'
 import useGeolocation from './hooks/useGeolocation'
-
+import ThemeToggle from './components/ThemeToggle'
 
 export default function App() {
   const { coords, error, loading } = useGeolocation()
@@ -15,8 +15,16 @@ export default function App() {
 
   return (
     <div className="container">
-      <h1>LocalLoop</h1>
-      <p className="muted">Anonymous, hyper-local posts that expire in 48h.</p>
+      {/* Top-right toggle */}
+      <header className="topbar">
+        <ThemeToggle />
+      </header>
+
+      {/* Centered title + subtitle */}
+      <div className="hero">
+        <h1 className="page-title">LocalLoop</h1>
+        <p className="subtitle muted">Anonymous, hyper-local posts that expire in 48h.</p>
+      </div>
 
       {loading && <p>Getting your location…</p>}
       {error && (
