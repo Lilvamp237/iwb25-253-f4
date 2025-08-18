@@ -24,7 +24,23 @@ export default function Feed() {
     }
   }
 
-  useEffect(() => { loadFeed(); }, []);
+  useEffect(() => { 
+    let alive = true;
+
+    const fetchFeed = async () => {
+        try {
+        const res = await fetch(`/api/feed?lat=${lat}&lon=${lon}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as Message[];
+        if (alive) {setMessages(data.map(m => ({ ...m, replies: Array.isArray(m.replies) ? m.replies : [] })));
+        }
+      } catch { /* ignore transient errors */ }
+    };
+
+    fetchFeed();
+    const id = setInterval(fetchFeed, 10_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   if (error) return <div style={{ color: 'crimson', marginTop: 12 }}>Feed error: {error}</div>;
   if (!messages.length) return <div style={{ marginTop: 12 }}>No messages yet.</div>;
