@@ -1,28 +1,36 @@
 import ballerina/http;
 import ballerina/time;
-//import ballerina/task;
-//import ballerina/io;
 
-// Define the Message type
-//type Message record {
-   // string text;
-   // string location;
-   // time:Utc timestamp;
-//}
+// -----------------------------
+// Type definitions
+// -----------------------------
 
-// Define the Message type with lat/lon and a unique ID
+type Reply record {|
+    readonly int id;
+    string text;
+    time:Utc timestamp;
+    Reply[] replies; // Nested replies
+|};
+
 type Message record {|
     readonly int id;
     string text;
     float lat;
     float lon;
     time:Utc timestamp;
+    Reply[] replies;
 |};
 
-// In-memory storage for messages
+// -----------------------------
+// In-memory storage
+// -----------------------------
+
 Message[] messages = [];
-// A counter for unique message IDs
 int messageIdCounter = 0;
+
+// -----------------------------
+// Service
+// -----------------------------
 
 service / on new http:Listener(8080) {
 
@@ -31,110 +39,150 @@ service / on new http:Listener(8080) {
         check caller->respond("OK");
     }
 
-    // POST /message endpoint
-    // POST /message endpoint (Final Corrected Version)
-// POST /message endpoint (Final Version with Decimal/Float fix)
-resource function post message(http:Caller caller, http:Request req) returns error? {
+    // POST /message - Create a new message
+    resource function post message(http:Caller caller, http:Request req) returns error? {
+        var payloadResult = req.getJsonPayload();
+        if payloadResult is error {
+            check caller->respond({ status: "error", message: "Invalid JSON format" });
+            return;
+        }
 
-    // 1. Get the JSON payload from the request.
-    var payloadResult = req.getJsonPayload();
-    if payloadResult is error {
-        http:BadRequest badRequestResponse = {body: "Invalid JSON format"};
-        check caller->respond(badRequestResponse);
-        return;
+        json payload = payloadResult;
+        if payload !is map<json> {
+            check caller->respond({ status: "error", message: "Payload must be a JSON object" });
+            return;
+        }
+
+        string? textValue = <string?>payload["text"];
+        float? latValue = <float?>payload["lat"];
+        float? lonValue = <float?>payload["lon"];
+
+        if textValue is () || latValue is () || lonValue is () {
+            check caller->respond({ status: "error", message: "Missing required fields: text, lat, lon" });
+            return;
+        }
+
+        int newId;
+        lock {
+            messageIdCounter += 1;
+            newId = messageIdCounter;
+        }
+
+        Message newMessage = {
+            id: newId,
+            text: textValue,
+            lat: latValue,
+            lon: lonValue,
+            timestamp: time:utcNow(),
+            replies: []
+        };
+
+        lock { messages.push(newMessage); }
+
+        http:Created createdResponse = { body: newMessage };
+        check caller->respond(createdResponse);
     }
 
-    json payload = payloadResult;
-    if payload !is map<json> {
-        http:BadRequest badRequestResponse = {body: "Payload must be a JSON object"};
-        check caller->respond(badRequestResponse);
-        return;
+    // POST /message/{id}/reply - Add a reply to a message or nested reply
+    resource function post message/[int id]/reply(http:Caller caller, http:Request req) returns error? {
+        var payloadResult = req.getJsonPayload();
+        if payloadResult is error {
+            check caller->respond({ status: "error", message: "Invalid JSON format" });
+            return;
+        }
+
+        json payload = payloadResult;
+        if payload !is map<json> {
+            check caller->respond({ status: "error", message: "Payload must be a JSON object" });
+            return;
+        }
+
+        string? textValue = <string?>payload["text"];
+        int? parentReplyId = <int?>payload["parentReplyId"]; // Optional, for nested replies
+
+        if textValue is () {
+            check caller->respond({ status: "error", message: "Reply text is required" });
+            return;
+        }
+
+        int newReplyId;
+        lock { messageIdCounter += 1; newReplyId = messageIdCounter; }
+
+        Reply newReply = {
+            id: newReplyId,
+            text: textValue,
+            timestamp: time:utcNow(),
+            replies: []
+        };
+
+        boolean added = false;
+        lock {
+            foreach var msg in messages {
+                if msg.id == id {
+                    // If parentReplyId is specified, find the parent reply
+                    if parentReplyId is int {
+                        if addNestedReply(msg.replies, parentReplyId, newReply) {
+                            added = true;
+                            break;
+                        }
+                    } else {
+                        // Add directly to message
+                        msg.replies.push(newReply);
+                        added = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !added {
+            check caller->respond({ status: "error", message: "Message or parent reply not found" });
+            return;
+        }
+
+        check caller->respond({ status: "success", reply: newReply });
     }
 
-    // 3. Safely extract the fields.
-    json textValue = payload.get("text");
-    json latValue = payload.get("lat");
-    json lonValue = payload.get("lon");
-
-    // 4. Validate the types. This is the UPDATED logic.
-    // It now accepts numbers as either 'float' OR 'decimal'.
-    if textValue !is string || (latValue !is float && latValue !is decimal) || (lonValue !is float && lonValue !is decimal) {
-        http:BadRequest badRequestResponse = {body: "Invalid payload. Required fields: text (string), lat (number), lon (number)"};
-        check caller->respond(badRequestResponse);
-        return;
-    }
-
-    // If all checks pass, we can now safely use the values.
-    int newId;
-    Message newMessage;
-
-    lock {
-        messageIdCounter += 1;
-        newId = messageIdCounter;
-    }
-
-    // 6. Create the full Message record, CASTING the numbers to float.
-    newMessage = {
-        id: newId,
-        text: textValue,
-        lat: <float>latValue, // <-- Convert decimal/float to float
-        lon: <float>lonValue, // <-- Convert decimal/float to float
-        timestamp: time:utcNow()
-    };
-
-    lock {
-        messages.push(newMessage);
-    }
-
-    http:Created createdResponse = {body: newMessage};
-    check caller->respond(createdResponse);
-}
-
-    // GET /feed endpoint (returns all messages for now)
-    //resource function get feed(http:Caller caller, http:Request req) returns error? {
-      //  check caller->respond({
-        //    status: "success",
-         //   feed: messages
-        //});
-    //}
-    // GET /feed endpoint (now with cleanup)
+    // GET /feed - Return all messages including replies
     resource function get feed(http:Caller caller, http:Request req) returns error? {
-    // --- NEW: Call the cleanup function first! ---
         performCleanup();
-
-    // Now, respond with the (now clean) list of messages.
-        check caller->respond({
-            status: "success",
-            feed: messages
-        });
+        check caller->respond({ status: "success", feed: messages });
     }
 
-    // Optional: dummy favicon resource to avoid browser errors
+    // Optional: dummy favicon
     resource function get favicon(http:Caller caller, http:Request req) returns error? {
         check caller->respond("");
     }
 }
 
+// -----------------------------
+// Add a nested reply recursively
+// -----------------------------
+function addNestedReply(Reply[] replies, int parentId, Reply newReply) returns boolean {
+    foreach var r in replies {
+        if r.id == parentId {
+            r.replies.push(newReply);
+            return true;
+        }
+        if addNestedReply(r.replies, parentId, newReply) {
+            return true;
+        }
+    }
+    return false;
+}
 
-
-// --- Day 2: Automatic Cleanup Job (Corrected) ---
-
-// This is our new, simple cleanup function.
+// -----------------------------
+// Cleanup old messages
+// -----------------------------
 function performCleanup() {
-    // Define the duration as a FLOAT to ensure correct type comparison.
-    //final float fortyEightHoursInSeconds = 48 * 60 * 60.0;
-    final float fortyEightHoursInSeconds = 15.0; // Used for testing
+    final float fortyEightHoursInSeconds = 15.0; // testing
     time:Utc now = time:utcNow();
 
     lock {
-        // Create a new list containing only messages that are NOT old.
         Message[] recentMessages = from var msg in messages
             where (<float>time:utcDiffSeconds(now, msg.timestamp) < fortyEightHoursInSeconds)
             select msg;
-        
-        // Replace the old list with the new, filtered list.
+
         messages = recentMessages;
     }
 }
-
-
