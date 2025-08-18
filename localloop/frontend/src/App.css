@@ -109,3 +109,73 @@ small { color: var(--muted); }
 
 /* Optional: compact on small screens */
 @media (max-width: 420px) { #theme-toggle-button { width: 5.6em; } }
+
+.btn-send {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  font-family: inherit;
+  font-size: 1rem;            /* was 20px; smaller fits your layout */
+  line-height: 1;
+  background: var(--primary); /* theme-aware */
+  color: var(--primary-contrast);
+  padding: 0.70em 1.0em;
+  padding-left: 0.9em;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s, filter 0.2s, background 0.2s;
+}
+
+.btn-send .btn-label {
+  display: block;
+  margin-left: 0.3em;
+  transition: transform 0.3s ease-in-out, opacity 0.2s;
+}
+
+.btn-send .svg-wrapper-1 { display: block; }
+.btn-send .svg-wrapper {
+  display: block;
+  transform-origin: center center;
+  transition: transform 0.3s ease-in-out;
+}
+
+.btn-send svg { display: block; }
+
+/* Hover animations (only when enabled) */
+.btn-send:not([disabled]):hover .svg-wrapper {
+  animation: fly-1 0.6s ease-in-out infinite alternate;
+}
+.btn-send:not([disabled]):hover svg {
+  transform: translateX(1.2em) rotate(45deg) scale(1.1);
+}
+.btn-send:not([disabled]):hover .btn-label {
+  transform: translateX(5em);
+}
+
+/* Press feedback */
+.btn-send:active { transform: scale(0.97); }
+
+/* Disabled state */
+.btn-send[disabled] {
+  opacity: .55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* Reduce motion: keep it classy for users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  .btn-send,
+  .btn-send * {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* Keyframes from the original */
+@keyframes fly-1 {
+  from { transform: translateY(0.1em); }
+  to   { transform: translateY(-0.1em); }
+}
