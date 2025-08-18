@@ -1,71 +1,93 @@
 import ballerina/http;
 import ballerina/time;
 
-// Define the Message type
-type Message record {
+// -------------------- Shared listener on :8080 --------------------
+listener http:Listener ll = new (8080);
+
+// -------------------- Types --------------------
+type Reply record {|
+    string id;
     string text;
-    string location;
     time:Utc timestamp;
-};
+|};
 
-// In-memory storage for messages
+type Message record {|
+    string id;
+    string text;
+    float lat;
+    float lon;
+    time:Utc timestamp;
+    Reply[] replies; // non-optional so we can .push()
+|};
+
+type PostIn record {|
+    string text;
+    float  lat;
+    float  lon;
+|};
+
+type ReplyIn record {|
+    string messageId;
+    string text;
+|};
+
+// -------------------- In-memory store --------------------
 Message[] messages = [];
+int nextId = 1;
 
-service / on new http:Listener(8080) {
-
-    // Health check endpoint
-    resource function get health(http:Caller caller, http:Request req) returns error? {
-        check caller->respond("OK");
+// -------------------- Root service (health) --------------------
+service / on ll {
+    resource function get health() returns string {
+        return "OK";
     }
+}
 
-    // POST /message endpoint
-    resource function post message(http:Caller caller, http:Request req) returns error? {
-        // Get JSON payload from request
-        json payload = check req.getJsonPayload();
-        map<json> payloadMap = <map<json>>payload;
+// -------------------- API service --------------------
+service /api on ll {
 
-        // Extract values safely
-        string textValue;
-        string locationValue;
+    // POST /api/message
+    resource function post message(http:Request req) returns json|error {
+        json raw = check req.getJsonPayload();
+        // Safely convert JSON -> typed record
+        PostIn p = check raw.cloneWithType(PostIn);
 
-        if payloadMap["text"] is string {
-            textValue = <string>payloadMap["text"];
-        } else {
-            check caller->respond({status: "error", message: "Text missing or invalid"});
-            return;
-        }
-
-        if payloadMap["location"] is string {
-            locationValue = <string>payloadMap["location"];
-        } else {
-            check caller->respond({status: "error", message: "Location missing or invalid"});
-            return;
-        }
-
-        // Create and store message
-        Message newMessage = {
-            text: textValue,
-            location: locationValue,
-            timestamp: time:utcNow()
+        Message msg = {
+            id: nextId.toString(),
+            text: p.text,
+            lat: p.lat,
+            lon: p.lon,
+            timestamp: time:utcNow(),
+            replies: []
         };
-        messages.push(newMessage);
+        messages.push(msg);
+        nextId += 1;
 
-        check caller->respond({
-            status: "Message stored",
-            message: newMessage
-        });
+        return { status: "Message stored", message: msg };
     }
 
-    // GET /feed endpoint (returns all messages for now)
-    resource function get feed(http:Caller caller, http:Request req) returns error? {
-        check caller->respond({
-            status: "success",
-            feed: messages
-        });
+    // GET /api/feed?lat=..&lon=..
+    resource function get feed(http:Request req, float lat, float lon) returns Message[]|error {
+        // TODO: apply ~2km distance filter using (lat, lon). For now return all.
+        return messages;
     }
 
-    // Optional: dummy favicon resource to avoid browser errors
-    resource function get favicon(http:Caller caller, http:Request req) returns error? {
-        check caller->respond("");
+    // POST /api/reply
+    resource function post reply(http:Request req) returns json|error {
+        json raw = check req.getJsonPayload();
+        ReplyIn rIn = check raw.cloneWithType(ReplyIn);
+
+        // Find the message and append reply
+        foreach int i in 0 ..< messages.length() {
+            if messages[i].id == rIn.messageId {
+                Reply r = {
+                    id: time:utcNow().toString(),
+                    text: rIn.text,
+                    timestamp: time:utcNow()
+                };
+                messages[i].replies.push(r);
+                return { status: "Reply stored", reply: r };
+            }
+        }
+        return { status: "not_found", messageId: rIn.messageId };
     }
 }

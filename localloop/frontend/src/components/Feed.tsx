@@ -1,65 +1,93 @@
-import React, { useEffect, useState } from 'react'
+// src/components/Feed.tsx
+import { useEffect, useMemo, useState } from 'react'
+import ReplyBox from '../ReplyBox'
 
-type Coords = { lat: number; lon: number }
-type Message = { id?: string; text: string; timestamp?: string }
+type Reply = { id: string; text: string; timestamp: string }
+type Message = { id: string; text: string; lat: number; lon: number; timestamp: string; replies?: Reply[] }
 
-function timeAgo(iso?: string) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const s = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (s < 60) return `${s}s ago`
-  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`
-  const days = Math.floor(h / 24); return `${days}d ago`
-}
-
-interface Props {
-  coords: Coords | null | undefined
-  refreshKey?: number
-}
-
-export default function Feed({ coords, refreshKey }: Props) {
+export default function Feed({ coords, refreshKey }: { coords: {lat:number; lon:number} | null | undefined; refreshKey?: number }) {
   const [messages, setMessages] = useState<Message[]>([])
-  const [error, setError] = useState<Error | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  const query = useMemo(() => {
+    if (!coords) return null
+    const { lat, lon } = coords
+    return `/api/feed?lat=${lat}&lon=${lon}`
+  }, [coords])
+
+  async function loadFeed() {
+    if (!query) return
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(query)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as Message[]
+      // sort newest → oldest; normalize replies
+      const normalized = data
+        .map(m => ({ ...m, replies: Array.isArray(m.replies) ? m.replies : [] }))
+        .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setMessages(normalized)
+    } catch (e: unknown) {
+      console.error(e)
+      setError(e instanceof Error ? e.message : 'Failed to load feed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-    async function fetchFeed() {
+    if (!query) return
+    let alive = true
+
+    const fetchFeed = async () => {
       try {
-        let url = '/api/feed'
-        if (coords) url += `?lat=${coords.lat}&lon=${coords.lon}`
-        const res = await fetch(url)
-        if (!res.ok) throw new Error('Feed request failed')
-        const data: Message[] = await res.json()
-        if (!cancelled) setMessages(data)
-      } catch (err) {
-        if (!cancelled) {
-          setError(err as Error)
-          // demo data fallback
-          setMessages([
-            { id: 'demo1', text: '(demo) Hello neighbors!', timestamp: new Date().toISOString() },
-            { id: 'demo2', text: '(demo) Anyone up for coffee?', timestamp: new Date(Date.now() - 120000).toISOString() }
-          ])
+        const res = await fetch(query)
+        if (!res.ok) return
+        const data = (await res.json()) as Message[]
+        if (alive) {
+          const normalized = data
+            .map(m => ({ ...m, replies: Array.isArray(m.replies) ? m.replies : [] }))
+            .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          setMessages(normalized)
+          setLoading(false)
         }
-      }
+      } catch { /* ignore transient errors */ }
     }
+
+    setLoading(true)
     fetchFeed()
-    const id = setInterval(fetchFeed, 10000)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [coords, refreshKey])
+    const id = setInterval(fetchFeed, 10_000)
+    return () => { alive = false; clearInterval(id) }
+  }, [query])
+
+  // manual refresh when PostForm calls onPosted()
+  useEffect(() => { if (refreshKey !== undefined) loadFeed() }, [refreshKey]) // <-- new
+
+  if (!coords) return <div style={{ marginTop: 12 }}>Enable location to see nearby posts.</div>
+  if (error) return <div style={{ color: 'crimson', marginTop: 12 }}>Feed error: {error}</div>
+  if (loading) return <div style={{ marginTop: 12 }}>Loading nearby messages…</div>
+  if (!messages.length) return <div style={{ marginTop: 12 }}>No messages within 2 km yet.</div>
 
   return (
-    <section>
+    <div style={{ marginTop: 16 }}>
       <h2>Nearby Messages</h2>
-      {error && <p className="muted">Showing demo feed (backend unreachable).</p>}
-      <ul>
-        {messages.map((m) => (
-          <li key={m.id ?? m.timestamp}>
-            <div>{m.text}</div>
-            <small>{m.timestamp ? timeAgo(m.timestamp) : ''}</small>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {messages.map(m => (
+          <li key={m.id} style={{ padding: 12, border: '1px solid #eee', borderRadius: 10, marginBottom: 12 }}>
+            <div style={{ fontWeight: 600 }}>{m.text}</div>
+
+            <ul style={{ listStyle: 'none', padding: 0, marginTop: 8 }}>
+              {m.replies?.map((r) => (
+                <li key={r.id} style={{ marginLeft: 12, color: '#444' }}>↳ {r.text}</li>
+              ))}
+            </ul>
+
+            <ReplyBox messageId={m.id} onReplied={loadFeed} />
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   )
 }
