@@ -116,24 +116,30 @@ service / on new http:Listener(8080) {
         };
 
         boolean added = false;
+        // ... inside the 'post message/[int id]/reply' function
         lock {
-            foreach var msg in messages {
-                if msg.id == id {
+            // Use an indexed loop to get a reference to the original message
+            foreach int i in 0 ..< messages.length() {
+                // Check if the message at the current index is the one we want
+                if messages[i].id == id {
                     // If parentReplyId is specified, find the parent reply
                     if parentReplyId is int {
-                        if addNestedReply(msg.replies, parentReplyId, newReply) {
+                        // The addNestedReply function works because arrays (like msg.replies)
+                        // are passed by reference.
+                        if addNestedReply(messages[i].replies, parentReplyId, newReply) {
                             added = true;
                             break;
                         }
                     } else {
-                        // Add directly to message
-                        msg.replies.push(newReply);
+                        // Add directly to the ORIGINAL message in the array
+                        messages[i].replies.push(newReply);
                         added = true;
-                        break;
+                        break; // Exit the loop since we found our message
                     }
                 }
             }
         }
+        // ...
 
         if !added {
             check caller->respond({ status: "error", message: "Message or parent reply not found" });
@@ -175,7 +181,8 @@ function addNestedReply(Reply[] replies, int parentId, Reply newReply) returns b
 // Cleanup old messages
 // -----------------------------
 function performCleanup() {
-    final float fortyEightHoursInSeconds = 15.0; // testing
+    final float fortyEightHoursInSeconds = 120.0; // testing
+
     time:Utc now = time:utcNow();
 
     lock {

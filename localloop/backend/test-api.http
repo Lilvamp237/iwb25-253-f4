@@ -1,4 +1,6 @@
 ### Post a new message
+
+# @name createMessage
 POST http://localhost:8080/message
 Content-Type: application/json
 
@@ -8,12 +10,158 @@ Content-Type: application/json
     "lon": 79.8
 }
 ###
-GET http://localhost:8080/feed
+# @name addFirstReply
+POST http://localhost:8080/message/{{createMessage.response.body.$.id}}/reply
+Content-Type: application/json
 
-HTTP/1.1 200  - OK
-content-type: application/json
-connection: close
-server: ballerina
-date: Sun, 17 Aug 2025 23:16:42 +0530
-content-encoding: gzip
-content-length: 57
+{
+    "text": "This is a direct reply to the first message."
+}
+###
+GET http://localhost:8080/health
+###
+POST http://localhost:8080/message
+Content-Type: application/json
+
+{
+    "text": "Hello from httpyac! This is the original message.",
+    "lat": 34.0522,
+    "lon": -118.2437
+}
+###
+POST http://localhost:8080/message/{{createMessage.response.body.$.id}}/reply
+Content-Type: application/json
+
+{
+    "text": "This is a direct reply to the first message."
+}
+###
+POST http://localhost:8080/message/{{createMessage.response.body.$.id}}/reply
+Content-Type: application/json
+
+{
+    "text": "This is a NESTED reply, replying to the direct reply.",
+    "parentReplyId": {{addFirstReply.response.body.$.reply.id}}
+}
+###
+GET http://localhost:8080/feed
+###
+# ===================================================================
+#                      !!! IMPORTANT !!!
+#
+#         WAIT FOR 15+ SECONDS BEFORE RUNNING THE NEXT REQUEST
+#
+# Your `performCleanup` function is set to delete messages
+# older than 15 seconds. Waiting will allow the cleanup to run.
+#
+# ===================================================================
+###
+# 6. Check the Feed (After Cleanup)
+# After waiting, send this request.
+# The feed should now be empty, confirming that the original message
+# AND all its nested replies have been deleted together.
+GET http://localhost:8080/feed```
+###
+
+
+*   **`@name createMessage`**: This names the request. We can then access its response using this name.
+*   **`{{createMessage.response.body.$.id}}`**: This is a powerful feature of `httpyac`. It's a variable that reads the JSON response (`response.body`) from the request named `createMessage` and extracts the value of the `id` field.
+*   **`{{addFirstReply.response.body.$.reply.id}}`**: Similarly, this gets the ID of the new reply from the JSON response of the `addFirstReply` request.
+*   **Sequential Testing**: By running these requests in order, you are simulating a real user interaction and can check the state of your application at each step using the `/feed` endpoint.
+###
+# ---------------------------------------------------
+# Test API for Ballerina Messaging Service
+#
+# Instructions:
+# 1. Make sure your Ballerina service is running.
+# 2. Send these requests in order from top to bottom.
+# ---------------------------------------------------
+###
+# @name healthCheck
+# 1. Health Check
+# First, let's make sure the service is up and running.
+# Expected Response: OK
+GET http://localhost:8080/health
+###
+# @name createMessage
+# 2. Create a New Message
+# This will create our main message. We'll capture its ID
+# from the response to use in the next steps.
+POST http://localhost:8080/message
+Content-Type: application/json
+
+{
+    "text": "Hello from httpyac! This is the original message.",
+    "lat": 34.0522,
+    "lon": -118.2437
+}
+###
+# @name addFirstReply
+# 3. Add a Direct Reply to the Message
+# This uses the ID from the `createMessage` request (`{{createMessage.response.body.$.id}}`)
+# to add a reply directly to the message.
+POST http://localhost:8080/message/{{createMessage.response.body.$.id}}/reply
+Content-Type: application/json
+
+{
+    "text": "This is a direct reply to the first message."
+}
+###
+# @name addNestedReply
+# 4. Add a Nested Reply
+# This adds a reply to the *previous reply*.
+# It uses the main message ID in the URL and the first reply's ID
+# (`{{addFirstReply.response.body.$.reply.id}}`) in the request body.
+POST http://localhost:8080/message/{{createMessage.response.body.$.id}}/reply
+Content-Type: application/json
+
+{
+    "text": "This is a NESTED reply, replying to the direct reply.",
+    "parentReplyId": {{addFirstReply.response.body.$.reply.id}}
+}
+###
+# 5. Check the Feed (Before Cleanup)
+# This will show the original message with its nested replies.
+# You should see the full structure you just created.
+GET http://localhost:8080/feed
+###
+# ---------------------------------------------------
+#  MANUAL TEST - NO VARIABLES
+#
+#  Instructions:
+#  1. Run the "Create Message" request below.
+#  2. From its response, find and copy the "id" number.
+#  3. Paste that number into the URL of the "Add Reply" request,
+#     replacing the text <PASTE_ID_HERE>.
+#  4. Run the "Add Reply" request.
+#  5. Run the "Check Feed" request to see the result.
+# ---------------------------------------------------
+
+###
+# STEP 1: Create a New Message
+# (Run this first)
+POST http://localhost:8080/message
+Content-Type: application/json
+
+{
+    "text": "Manual test message.",
+    "lat": 1.0,
+    "lon": 1.0
+}
+
+
+###
+# STEP 2: Add a Reply
+# (Manually replace <PASTE_ID_HERE> with the ID from the response above)
+POST http://localhost:8080/message/15/reply
+Content-Type: application/json
+
+{
+    "text": "This is a manually added reply."
+}
+
+
+###
+# STEP 3: Check the Feed
+# (Run this last to see the final result)
+GET http://localhost:8080/feed
