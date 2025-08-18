@@ -17,8 +17,22 @@ type Message record {|
     string text;
     float lat;
     float lon;
+    float lat;
+    float lon;
     time:Utc timestamp;
-    Reply[] replies;
+    Reply[] replies; // non-optional so we can .push()
+|};
+
+type PostIn record {|
+    string text;
+    float  lat;
+    float  lon;
+|};
+
+type ReplyIn record {|
+    string messageId;
+    string text;
+|    Reply[] replies;
 |};
 
 // -----------------------------
