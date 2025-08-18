@@ -2,12 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LocalLoop</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- plain HTML fallback to prove the page renders -->
+    <div id="html-check" style="padding:16px; font-family:system-ui,Arial">
+      ✅ HTML loaded. If you can see this, Vite is serving index.html.
+    </div>
+
+    <!-- IMPORTANT: use the NEW entry file -->
+    <script type="module" src="/src/boot.tsx"></script>
   </body>
 </html>
