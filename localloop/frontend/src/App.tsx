@@ -1,35 +1,40 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import './app.css'
+import PostForm from './components/PostForm'
+import Feed from './components/Feed'
+import useGeolocation from './hooks/useGeolocation'
+import ThemeToggle from './components/ThemeToggle'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const { coords, error, loading } = useGeolocation()
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  function onPosted() {
+    setRefreshKey((k) => k + 1)
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="container">
+      {/* Top-right toggle */}
+      <header className="topbar">
+        <ThemeToggle />
+      </header>
+
+      {/* Centered title + subtitle */}
+      <div className="hero">
+        <h1 className="page-title">LocalLoop</h1>
+        <p className="subtitle muted">Anonymous, hyper-local posts that expire in 48h.</p>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
+
+      {loading && <p>Getting your location…</p>}
+      {error && (
+        <p className="muted">
+          Location unavailable. You can still view a demo feed or retry later.
         </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+      )}
+
+      <PostForm coords={coords} onPosted={onPosted} />
+      <Feed coords={coords} refreshKey={refreshKey} />
+    </div>
   )
 }
-
-export default App
