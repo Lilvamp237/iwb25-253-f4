@@ -9,32 +9,34 @@ export default function App() {
   const { coords, error, loading } = useGeolocation()
   const [refreshKey, setRefreshKey] = useState(0)
 
-  function onPosted() {
+  // This function is passed down to trigger a re-render of the feed
+  function refreshFeed() {
     setRefreshKey((k) => k + 1)
   }
 
   return (
     <div className="container">
-      {/* Top-right toggle */}
       <header className="topbar">
         <ThemeToggle />
       </header>
 
-      {/* Centered title + subtitle */}
       <div className="hero">
         <h1 className="page-title">LocalLoop</h1>
         <p className="subtitle muted">Anonymous, hyper-local posts that expire in 48h.</p>
       </div>
 
-      {loading && <p>Getting your location…</p>}
+      {loading && <p className="muted">Getting your location…</p>}
       {error && (
-        <p className="muted">
-          Location unavailable. You can still view a demo feed or retry later.
+        <p className="error-text">
+          Location unavailable. You can't post, but you can view the feed.
         </p>
       )}
 
-      <PostForm coords={coords} onPosted={onPosted} />
-      <Feed coords={coords} refreshKey={refreshKey} />
+      {/* PostForm creates new messages and triggers a refresh */}
+      <PostForm coords={coords} onPosted={refreshFeed} />
+      
+      {/* Feed fetches data and its children will also trigger a refresh */}
+      <Feed refreshKey={refreshKey} onRefreshed={refreshFeed} />
     </div>
   )
 }
