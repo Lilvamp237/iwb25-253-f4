@@ -1,93 +1,195 @@
 import ballerina/http;
 import ballerina/time;
 
-// -------------------- Shared listener on :8080 --------------------
-listener http:Listener ll = new (8080);
+// -----------------------------
+// Type definitions
+// -----------------------------
 
-// -------------------- Types --------------------
 type Reply record {|
-    string id;
+    readonly int id;
     string text;
     time:Utc timestamp;
+    Reply[] replies; // Nested replies
 |};
 
 type Message record {|
-    string id;
+    readonly int id;
     string text;
     float lat;
     float lon;
     time:Utc timestamp;
-    Reply[] replies; // non-optional so we can .push()
+    Reply[] replies;
 |};
 
-type PostIn record {|
-    string text;
-    float  lat;
-    float  lon;
-|};
+// -----------------------------
+// In-memory storage
+// -----------------------------
 
-type ReplyIn record {|
-    string messageId;
-    string text;
-|};
-
-// -------------------- In-memory store --------------------
 Message[] messages = [];
-int nextId = 1;
+int messageIdCounter = 0;
 
-// -------------------- Root service (health) --------------------
-service / on ll {
-    resource function get health() returns string {
-        return "OK";
+// -----------------------------
+// Service
+// -----------------------------
+
+service / on new http:Listener(8080) {
+
+    // Health check endpoint
+    resource function get health(http:Caller caller, http:Request req) returns error? {
+        check caller->respond("OK");
     }
-}
 
-// -------------------- API service --------------------
-service /api on ll {
+    // POST /message - Create a new message
+    resource function post message(http:Caller caller, http:Request req) returns error? {
+        var payloadResult = req.getJsonPayload();
+        if payloadResult is error {
+            check caller->respond({ status: "error", message: "Invalid JSON format" });
+            return;
+        }
 
-    // POST /api/message
-    resource function post message(http:Request req) returns json|error {
-        json raw = check req.getJsonPayload();
-        // Safely convert JSON -> typed record
-        PostIn p = check raw.cloneWithType(PostIn);
+        json payload = payloadResult;
+        if payload !is map<json> {
+            check caller->respond({ status: "error", message: "Payload must be a JSON object" });
+            return;
+        }
 
-        Message msg = {
-            id: nextId.toString(),
-            text: p.text,
-            lat: p.lat,
-            lon: p.lon,
+        string? textValue = <string?>payload["text"];
+        float? latValue = <float?>payload["lat"];
+        float? lonValue = <float?>payload["lon"];
+
+        if textValue is () || latValue is () || lonValue is () {
+            check caller->respond({ status: "error", message: "Missing required fields: text, lat, lon" });
+            return;
+        }
+
+        int newId;
+        lock {
+            messageIdCounter += 1;
+            newId = messageIdCounter;
+        }
+
+        Message newMessage = {
+            id: newId,
+            text: textValue,
+            lat: latValue,
+            lon: lonValue,
             timestamp: time:utcNow(),
             replies: []
         };
-        messages.push(msg);
-        nextId += 1;
 
-        return { status: "Message stored", message: msg };
+        lock { messages.push(newMessage); }
+
+        http:Created createdResponse = { body: newMessage };
+        check caller->respond(createdResponse);
     }
 
-    // GET /api/feed?lat=..&lon=..
-    resource function get feed(http:Request req, float lat, float lon) returns Message[]|error {
-        // TODO: apply ~2km distance filter using (lat, lon). For now return all.
-        return messages;
-    }
+    // POST /message/{id}/reply - Add a reply to a message or nested reply
+    resource function post message/[int id]/reply(http:Caller caller, http:Request req) returns error? {
+        var payloadResult = req.getJsonPayload();
+        if payloadResult is error {
+            check caller->respond({ status: "error", message: "Invalid JSON format" });
+            return;
+        }
 
-    // POST /api/reply
-    resource function post reply(http:Request req) returns json|error {
-        json raw = check req.getJsonPayload();
-        ReplyIn rIn = check raw.cloneWithType(ReplyIn);
+        json payload = payloadResult;
+        if payload !is map<json> {
+            check caller->respond({ status: "error", message: "Payload must be a JSON object" });
+            return;
+        }
 
-        // Find the message and append reply
-        foreach int i in 0 ..< messages.length() {
-            if messages[i].id == rIn.messageId {
-                Reply r = {
-                    id: time:utcNow().toString(),
-                    text: rIn.text,
-                    timestamp: time:utcNow()
-                };
-                messages[i].replies.push(r);
-                return { status: "Reply stored", reply: r };
+        string? textValue = <string?>payload["text"];
+        int? parentReplyId = <int?>payload["parentReplyId"]; // Optional, for nested replies
+
+        if textValue is () {
+            check caller->respond({ status: "error", message: "Reply text is required" });
+            return;
+        }
+
+        int newReplyId;
+        lock { messageIdCounter += 1; newReplyId = messageIdCounter; }
+
+        Reply newReply = {
+            id: newReplyId,
+            text: textValue,
+            timestamp: time:utcNow(),
+            replies: []
+        };
+
+        boolean added = false;
+        // ... inside the 'post message/[int id]/reply' function
+        lock {
+            // Use an indexed loop to get a reference to the original message
+            foreach int i in 0 ..< messages.length() {
+                // Check if the message at the current index is the one we want
+                if messages[i].id == id {
+                    // If parentReplyId is specified, find the parent reply
+                    if parentReplyId is int {
+                        // The addNestedReply function works because arrays (like msg.replies)
+                        // are passed by reference.
+                        if addNestedReply(messages[i].replies, parentReplyId, newReply) {
+                            added = true;
+                            break;
+                        }
+                    } else {
+                        // Add directly to the ORIGINAL message in the array
+                        messages[i].replies.push(newReply);
+                        added = true;
+                        break; // Exit the loop since we found our message
+                    }
+                }
             }
         }
-        return { status: "not_found", messageId: rIn.messageId };
+        // ...
+
+        if !added {
+            check caller->respond({ status: "error", message: "Message or parent reply not found" });
+            return;
+        }
+
+        check caller->respond({ status: "success", reply: newReply });
+    }
+
+    // GET /feed - Return all messages including replies
+    resource function get feed(http:Caller caller, http:Request req) returns error? {
+        performCleanup();
+        check caller->respond({ status: "success", feed: messages });
+    }
+
+    // Optional: dummy favicon
+    resource function get favicon(http:Caller caller, http:Request req) returns error? {
+        check caller->respond("");
+    }
+}
+
+// -----------------------------
+// Add a nested reply recursively
+// -----------------------------
+function addNestedReply(Reply[] replies, int parentId, Reply newReply) returns boolean {
+    foreach var r in replies {
+        if r.id == parentId {
+            r.replies.push(newReply);
+            return true;
+        }
+        if addNestedReply(r.replies, parentId, newReply) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// -----------------------------
+// Cleanup old messages
+// -----------------------------
+function performCleanup() {
+    final float fortyEightHoursInSeconds = 120.0; // testing
+
+    time:Utc now = time:utcNow();
+
+    lock {
+        Message[] recentMessages = from var msg in messages
+            where (<float>time:utcDiffSeconds(now, msg.timestamp) < fortyEightHoursInSeconds)
+            select msg;
+
+        messages = recentMessages;
     }
 }

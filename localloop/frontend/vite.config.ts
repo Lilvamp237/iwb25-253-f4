@@ -8,6 +8,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // This is the crucial change:
+        // Rewrite /api/feed to /feed for the backend
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
