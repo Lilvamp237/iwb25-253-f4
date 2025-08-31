@@ -10,7 +10,7 @@ interface Props {
   userLon: number; // current user longitude
 }
 
-const LOCATIONIQ_API_KEY = "pk.d829eb50a3f25e6550fe96f2be1cd6cf";
+const LOCATIONIQ_API_KEY = "API_KEY";
 
 export default function MessageComponent({ message, onReplyPosted, userLat, userLon }: Props) {
   const [showReplyForm, setShowReplyForm] = useState(false);

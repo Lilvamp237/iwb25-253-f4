@@ -167,7 +167,8 @@ function addNestedReply(Reply[] replies, int parentId, Reply newReply) returns b
 // Cleanup old messages
 // -----------------------------
 function performCleanup() {
-    final float fortyEightHoursInSeconds = 172800.0; // testing
+    final float fortyEightHoursInSeconds = 3600.0; // testing
+    //final float fortyEightHoursInSeconds = 172800.0;
 
     time:Utc now = time:utcNow();
 
