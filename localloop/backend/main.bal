@@ -17,7 +17,7 @@ type Message record {|
     string text;
     float lat;
     float lon;
-    string timestamp;   // store as ISO string
+    string timestamp;
     Reply[] replies;
 |};
 
@@ -34,12 +34,10 @@ int messageIdCounter = 0;
 
 service / on new http:Listener(8080) {
 
-    // Health check endpoint
     resource function get health(http:Caller caller, http:Request req) returns error? {
         check caller->respond("OK");
     }
 
-    // POST /message - Create a new message
     resource function post message(http:Caller caller, http:Request req) returns error? {
         var payloadResult = req.getJsonPayload();
         if payloadResult is error {
@@ -83,7 +81,6 @@ service / on new http:Listener(8080) {
         check caller->respond(createdResponse);
     }
 
-    // POST /message/{id}/reply - Add a reply to a message or nested reply
     resource function post message/[int id]/reply(http:Caller caller, http:Request req) returns error? {
         var payloadResult = req.getJsonPayload();
         if payloadResult is error {
@@ -141,13 +138,10 @@ service / on new http:Listener(8080) {
         check caller->respond({ status: "success", reply: newReply });
     }
 
-    // GET /feed - Return all messages including replies
     resource function get feed(http:Caller caller, http:Request req) returns error? {
         performCleanup();
         check caller->respond({ status: "success", feed: messages });
     }
-
-    // Optional: dummy favicon
     resource function get favicon(http:Caller caller, http:Request req) returns error? {
         check caller->respond("");
     }

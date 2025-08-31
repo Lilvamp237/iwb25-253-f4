@@ -9,7 +9,6 @@ export default function App() {
   const { coords, error, loading } = useGeolocation()
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // This function is passed down to trigger a re-render of the feed
   function refreshFeed() {
     setRefreshKey((k) => k + 1)
   }
