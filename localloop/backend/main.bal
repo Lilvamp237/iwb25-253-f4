@@ -8,7 +8,7 @@ import ballerina/time;
 type Reply record {|
     readonly int id;
     string text;
-    time:Utc timestamp;
+    string timestamp;   // store as ISO string
     Reply[] replies; // Nested replies
 |};
 
@@ -17,7 +17,7 @@ type Message record {|
     string text;
     float lat;
     float lon;
-    time:Utc timestamp;
+    string timestamp;   // store as ISO string
     Reply[] replies;
 |};
 
@@ -54,10 +54,10 @@ service / on new http:Listener(8080) {
         }
 
         string? textValue = <string?>payload["text"];
-        float? latValue = <float?>payload["lat"];
-        float? lonValue = <float?>payload["lon"];
+        float|error latResult = payload["lat"].cloneWithType(float);
+        float|error lonResult = payload["lon"].cloneWithType(float);
 
-        if textValue is () || latValue is () || lonValue is () {
+        if textValue is () || latResult is error || lonResult is error {
             check caller->respond({ status: "error", message: "Missing required fields: text, lat, lon" });
             return;
         }
@@ -71,9 +71,9 @@ service / on new http:Listener(8080) {
         Message newMessage = {
             id: newId,
             text: textValue,
-            lat: latValue,
-            lon: lonValue,
-            timestamp: time:utcNow(),
+            lat: latResult,
+            lon: lonResult,
+            timestamp: time:utcToString(time:utcNow()), // ✅ ISO timestamp
             replies: []
         };
 
@@ -111,35 +111,27 @@ service / on new http:Listener(8080) {
         Reply newReply = {
             id: newReplyId,
             text: textValue,
-            timestamp: time:utcNow(),
+            timestamp: time:utcToString(time:utcNow()), // ✅ ISO timestamp
             replies: []
         };
 
         boolean added = false;
-        // ... inside the 'post message/[int id]/reply' function
         lock {
-            // Use an indexed loop to get a reference to the original message
             foreach int i in 0 ..< messages.length() {
-                // Check if the message at the current index is the one we want
                 if messages[i].id == id {
-                    // If parentReplyId is specified, find the parent reply
                     if parentReplyId is int {
-                        // The addNestedReply function works because arrays (like msg.replies)
-                        // are passed by reference.
                         if addNestedReply(messages[i].replies, parentReplyId, newReply) {
                             added = true;
                             break;
                         }
                     } else {
-                        // Add directly to the ORIGINAL message in the array
                         messages[i].replies.push(newReply);
                         added = true;
-                        break; // Exit the loop since we found our message
+                        break;
                     }
                 }
             }
         }
-        // ...
 
         if !added {
             check caller->respond({ status: "error", message: "Message or parent reply not found" });
@@ -187,9 +179,12 @@ function performCleanup() {
 
     lock {
         Message[] recentMessages = from var msg in messages
-            where (<float>time:utcDiffSeconds(now, msg.timestamp) < fortyEightHoursInSeconds)
+            let time:Utc|error msgTime = time:utcFromString(msg.timestamp)
+            where msgTime is time:Utc &&
+                  <float>time:utcDiffSeconds(now, msgTime) < fortyEightHoursInSeconds
             select msg;
 
         messages = recentMessages;
     }
 }
+
