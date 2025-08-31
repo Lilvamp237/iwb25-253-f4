@@ -8,7 +8,7 @@ interface Props {
   onReplyPosted: () => void;
 }
 
-const LOCATIONIQ_API_KEY = "YOUR_API_KEY";
+const LOCATIONIQ_API_KEY = "pk.d829eb50a3f25e6550fe96f2be1cd6cf";
 
 export default function MessageComponent({ message, onReplyPosted }: Props) {
   const [showReplyForm, setShowReplyForm] = useState(false);
@@ -49,20 +49,24 @@ export default function MessageComponent({ message, onReplyPosted }: Props) {
         {districtName ? ` · ${districtName}` : ""}
       </small>
 
-      <div className="actions mt-6 flex gap-4">
+      <div className="actions" style={{ marginTop: 8 }}>
         <button
           className="btn-link"
           onClick={() => setShowReplyForm(!showReplyForm)}
         >
-          {showReplyForm ? 'Cancel Reply' : `Reply (${message.replies.length})`}
+          {showReplyForm ? 'Cancel Reply' : 'Reply'}
         </button>
 
+        {/* Only show toggle if there are replies */}
         {message.replies.length > 0 && (
           <button
             className="btn-link"
+            style={{ marginLeft: 12 }}
             onClick={() => setShowReplies(!showReplies)}
           >
-            {showReplies ? ' Hide Replies' : ` Show Replies (${message.replies.length})`}
+            {showReplies
+              ? `Hide Replies`
+              : `Show Replies (${message.replies.length})`}
           </button>
         )}
       </div>
