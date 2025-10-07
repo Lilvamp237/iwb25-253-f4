@@ -135,30 +135,8 @@ npm run test
 
 ---
 
-## 👨‍💻 Author
-
-**Sumudu Ishadi Ratnayake**
-📧 [Your email or GitHub link here]
-💼 [LinkedIn or Portfolio link]
-
----
-
 ## 🪪 License
 
 This project is open source and available under the [MIT License](LICENSE).
 
-```
-
----
-
-✅ This version:
-- Professionally describes the **purpose and tech stack**
-- Clearly explains **setup for both backend and frontend**
-- Looks clean on GitHub (sections + emojis + code blocks)
-- Perfect for your **portfolio and university project submissions**
-
----
-
-Would you like me to make it slightly more **personalized** (e.g., what Localloop *actually does* — such as local API routing, service discovery, or event handling)?  
-That’ll make the “About” section stronger and more project-specific.
 ```
